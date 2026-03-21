@@ -56,6 +56,8 @@ class ACE_Admin {
                 'approved',
                 'scheduled',
                 'published',
+                'failed',
+                'archived',
             ],
             'networks' => [
                 'x' => [
@@ -63,29 +65,24 @@ class ACE_Admin {
                     'account_name' => '',
                     'client_id' => '',
                     'client_secret' => '',
-                    'access_token' => '',
-                    'refresh_token' => '',
                 ],
                 'facebook' => [
                     'label' => 'Facebook',
                     'account_name' => '',
                     'app_id' => '',
                     'app_secret' => '',
-                    'access_token' => '',
                 ],
                 'instagram' => [
                     'label' => 'Instagram',
                     'account_name' => '',
                     'app_id' => '',
                     'app_secret' => '',
-                    'access_token' => '',
                 ],
                 'linkedin' => [
                     'label' => 'LinkedIn',
                     'account_name' => '',
                     'client_id' => '',
                     'client_secret' => '',
-                    'access_token' => '',
                 ],
             ],
         ];
@@ -123,8 +120,6 @@ class ACE_Admin {
                 'app_secret' => sanitize_text_field($network_value['app_secret'] ?? ''),
                 'client_id' => sanitize_text_field($network_value['client_id'] ?? ''),
                 'client_secret' => sanitize_text_field($network_value['client_secret'] ?? ''),
-                'access_token' => sanitize_text_field($network_value['access_token'] ?? ''),
-                'refresh_token' => sanitize_text_field($network_value['refresh_token'] ?? ''),
             ];
         }
 
@@ -138,7 +133,7 @@ class ACE_Admin {
         foreach ($settings['networks'] as $network_key => $network) {
             $has_identity = !empty($network['account_name']);
             $has_key = !empty($network['app_id']) || !empty($network['client_id']);
-            $has_secret = !empty($network['access_token']) || !empty($network['app_secret']) || !empty($network['client_secret']) || !empty($network['refresh_token']);
+            $has_secret = !empty($network['app_secret']) || !empty($network['client_secret']);
             $configured = $has_identity || $has_key || $has_secret;
 
             $statuses[$network_key] = [
@@ -152,31 +147,15 @@ class ACE_Admin {
         return $statuses;
     }
 
-    public static function get_calendar_preview($settings = null) {
-        $settings = is_array($settings) ? $settings : self::get_settings();
-        $time = $settings['default_publish_time'];
-
-        return [
-            ['day' => 'Mon', 'date' => '24 Mar', 'items' => [['time' => $time, 'title' => 'Match reaction post', 'network' => 'X', 'status' => 'Scheduled']]],
-            ['day' => 'Tue', 'date' => '25 Mar', 'items' => [['time' => $time, 'title' => 'LinkedIn promo variant', 'network' => 'LinkedIn', 'status' => 'Awaiting approval']]],
-            ['day' => 'Wed', 'date' => '26 Mar', 'items' => [['time' => $time, 'title' => 'Newsletter support post', 'network' => 'Facebook', 'status' => 'Drafted']]],
-            ['day' => 'Thu', 'date' => '27 Mar', 'items' => [['time' => $time, 'title' => 'Evergreen tutorial reshare', 'network' => 'X', 'status' => 'Scheduled']]],
-            ['day' => 'Fri', 'date' => '28 Mar', 'items' => [['time' => $time, 'title' => 'Weekend teaser post', 'network' => 'Instagram', 'status' => 'Approved']]],
-            ['day' => 'Sat', 'date' => '29 Mar', 'items' => []],
-            ['day' => 'Sun', 'date' => '30 Mar', 'items' => []],
-        ];
-    }
-
     public static function get_admin_bootstrap_data() {
         $settings = self::get_settings();
-        $statuses = self::get_network_statuses($settings);
 
         return [
             'restBase' => rest_url('ace-social/v1/'),
             'nonce' => wp_create_nonce('wp_rest'),
             'settings' => $settings,
-            'networkStatuses' => $statuses,
-            'calendar' => self::get_calendar_preview($settings),
+            'networkStatuses' => self::get_network_statuses($settings),
+            'plannerItems' => ACE_Planner::get_items(),
             'hasApiKey' => get_option('ace_openai_key', '') !== '',
             'notices' => [
                 'success' => ACE_Provider_X::pop_notice('success'),
@@ -190,22 +169,51 @@ class ACE_Admin {
             return;
         }
 
-        wp_enqueue_style(
-            'ace-social-planner-admin',
-            plugin_dir_url(__FILE__) . '../admin/style.css',
-            [],
-            filemtime(plugin_dir_path(__FILE__) . '../admin/style.css')
-        );
+        $build_dir = plugin_dir_path(__FILE__) . '../build/';
+        $build_url = plugin_dir_url(__FILE__) . '../build/';
+        $script_asset_path = $build_dir . 'index.asset.php';
+        $script_path = $build_dir . 'index.js';
+        $style_path = $build_dir . 'style-index.css';
+        $script_handle = 'ace-social-planner-admin-legacy';
 
-        wp_enqueue_script(
-            'ace-social-planner-admin',
-            plugin_dir_url(__FILE__) . '../admin/app.js',
-            ['wp-element'],
-            filemtime(plugin_dir_path(__FILE__) . '../admin/app.js'),
-            true
-        );
+        if (file_exists($script_asset_path) && file_exists($script_path)) {
+            $asset = require $script_asset_path;
+            $script_handle = 'ace-social-planner-admin';
 
-        wp_localize_script('ace-social-planner-admin', 'aceSocialPlanner', self::get_admin_bootstrap_data());
+            wp_enqueue_script(
+                $script_handle,
+                $build_url . 'index.js',
+                isset($asset['dependencies']) ? $asset['dependencies'] : ['wp-element'],
+                isset($asset['version']) ? $asset['version'] : filemtime($script_path),
+                true
+            );
+
+            if (file_exists($style_path)) {
+                wp_enqueue_style(
+                    $script_handle,
+                    $build_url . 'style-index.css',
+                    ['wp-components'],
+                    filemtime($style_path)
+                );
+            }
+        } else {
+            wp_enqueue_style(
+                $script_handle,
+                plugin_dir_url(__FILE__) . '../admin/style.css',
+                [],
+                filemtime(plugin_dir_path(__FILE__) . '../admin/style.css')
+            );
+
+            wp_enqueue_script(
+                $script_handle,
+                plugin_dir_url(__FILE__) . '../admin/app.js',
+                ['wp-element'],
+                filemtime(plugin_dir_path(__FILE__) . '../admin/app.js'),
+                true
+            );
+        }
+
+        wp_localize_script($script_handle, 'aceSocialPlanner', self::get_admin_bootstrap_data());
     }
 
     private static function merge_settings($defaults, $saved) {

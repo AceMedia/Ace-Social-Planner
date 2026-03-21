@@ -11,6 +11,7 @@ if (!defined('ABSPATH')) {
 }
 
 require_once plugin_dir_path(__FILE__) . 'includes/class-ai.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-planner.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-api.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-admin.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-provider-x.php';
