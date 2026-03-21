@@ -1,57 +1,232 @@
-.ace-social-planner {
-    max-width: 1100px;
+.ace-social-planner-page {
+    margin-top: 16px;
 }
 
-.ace-social-planner__intro {
+.ace-social-planner-app {
+    max-width: 1280px;
+    padding-right: 20px;
+}
+
+.ace-social-planner-hero {
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    align-items: flex-start;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef4f7 100%);
+    border: 1px solid #dcdcde;
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 18px;
+}
+
+.ace-social-planner-hero h1 {
+    margin: 0 0 8px;
+    font-size: 30px;
+    line-height: 1.1;
+}
+
+.ace-social-planner-hero p {
+    margin: 0;
     max-width: 720px;
-    margin-bottom: 20px;
+    color: #3c434a;
+    font-size: 15px;
 }
 
-.ace-social-planner__grid {
+.ace-social-planner-hero__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.ace-social-planner-tabs {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 18px 0;
+}
+
+.ace-social-planner-tab {
+    appearance: none;
+    border: 1px solid #c3c4c7;
+    background: #fff;
+    border-radius: 999px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.ace-social-planner-tab.is-active {
+    background: #1d2327;
+    color: #fff;
+    border-color: #1d2327;
+}
+
+.ace-social-planner-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 18px;
 }
 
-.ace-social-planner__panel {
+.ace-social-planner-metric,
+.ace-social-planner-panel {
     background: #fff;
     border: 1px solid #dcdcde;
-    border-radius: 8px;
+    border-radius: 12px;
     padding: 20px;
     box-sizing: border-box;
 }
 
-.ace-social-planner__panel h2 {
+.ace-social-planner-metric__label,
+.ace-social-planner-metric__hint,
+.ace-social-planner-field__label,
+.ace-social-planner-calendar__header span,
+.ace-social-planner-event__network,
+.description {
+    display: block;
+    color: #50575e;
+}
+
+.ace-social-planner-metric__value {
+    display: block;
+    font-size: 28px;
+    margin: 8px 0;
+}
+
+.ace-social-planner-layout {
+    display: grid;
+    gap: 18px;
+}
+
+.ace-social-planner-layout--two {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.ace-social-planner-layout--accounts {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.ace-social-planner-panel h2,
+.ace-social-planner-panel h3 {
     margin-top: 0;
 }
 
-#ace-social-planner-content {
-    width: 100%;
-    min-height: 220px;
-    margin-top: 8px;
-    margin-bottom: 12px;
-}
-
-.ace-social-planner__actions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.ace-social-planner-panel__header {
     margin-bottom: 16px;
 }
 
-#ace-social-planner-status.is-error {
-    color: #b32d2e;
+.ace-social-planner-list {
+    margin: 0;
+    padding-left: 18px;
 }
 
-#ace-social-planner-status.is-success {
-    color: #007017;
+.ace-social-planner-field {
+    display: block;
+    margin-bottom: 14px;
 }
 
-.ace-social-planner__output {
-    min-height: 260px;
+.ace-social-planner-field input,
+.ace-social-planner-field textarea,
+.ace-social-planner-field select {
+    width: 100%;
+    margin-top: 6px;
+}
+
+.ace-social-planner-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.ace-social-planner-output {
+    min-height: 220px;
     border: 1px solid #dcdcde;
-    border-radius: 6px;
+    border-radius: 8px;
     padding: 16px;
     background: #f6f7f7;
     white-space: pre-wrap;
+}
+
+.ace-social-planner-calendar {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(160px, 1fr));
+    gap: 12px;
+    overflow-x: auto;
+}
+
+.ace-social-planner-calendar__column {
+    min-width: 160px;
+    border: 1px solid #dcdcde;
+    border-radius: 10px;
+    background: #fcfcfc;
+}
+
+.ace-social-planner-calendar__header {
+    padding: 14px;
+    border-bottom: 1px solid #dcdcde;
+    background: #f6f7f7;
+}
+
+.ace-social-planner-calendar__body {
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.ace-social-planner-event {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.ace-social-planner-event--empty {
+    color: #646970;
+    text-align: center;
+}
+
+.ace-social-planner-event__time {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #007cba;
+    margin-bottom: 6px;
+}
+
+.ace-social-planner-event__title {
+    display: block;
+    margin-bottom: 6px;
+}
+
+.ace-social-planner-network__heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.ace-social-planner-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: #f0f0f1;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.ace-social-planner-badge.is-ready {
+    background: #dff5e3;
+    color: #0a5c24;
+}
+
+@media (max-width: 782px) {
+    .ace-social-planner-hero {
+        flex-direction: column;
+    }
+
+    .ace-social-planner-calendar {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+    }
 }
