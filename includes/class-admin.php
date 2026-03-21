@@ -34,6 +34,10 @@ class ACE_Admin {
         ]);
     }
 
+    public static function maybe_handle_oauth_callbacks() {
+        ACE_Provider_X::handle_callback();
+    }
+
     public static function sanitize_api_key($value) {
         return trim(sanitize_text_field((string) $value));
     }
@@ -44,7 +48,24 @@ class ACE_Admin {
             'default_timezone' => wp_timezone_string() ?: 'UTC',
             'default_publish_time' => '09:00',
             'week_starts_on' => 'monday',
+            'content_types' => ['post'],
+            'post_statuses' => [
+                'not_planned',
+                'drafted',
+                'awaiting_approval',
+                'approved',
+                'scheduled',
+                'published',
+            ],
             'networks' => [
+                'x' => [
+                    'label' => 'X',
+                    'account_name' => '',
+                    'client_id' => '',
+                    'client_secret' => '',
+                    'access_token' => '',
+                    'refresh_token' => '',
+                ],
                 'facebook' => [
                     'label' => 'Facebook',
                     'account_name' => '',
@@ -66,13 +87,6 @@ class ACE_Admin {
                     'client_secret' => '',
                     'access_token' => '',
                 ],
-                'x' => [
-                    'label' => 'X',
-                    'account_name' => '',
-                    'api_key' => '',
-                    'api_secret' => '',
-                    'access_token' => '',
-                ],
             ],
         ];
     }
@@ -92,6 +106,8 @@ class ACE_Admin {
             'default_timezone' => sanitize_text_field($value['default_timezone'] ?? $defaults['default_timezone']),
             'default_publish_time' => sanitize_text_field($value['default_publish_time'] ?? $defaults['default_publish_time']),
             'week_starts_on' => in_array(($value['week_starts_on'] ?? ''), ['monday', 'sunday'], true) ? $value['week_starts_on'] : $defaults['week_starts_on'],
+            'content_types' => array_values(array_filter(array_map('sanitize_key', isset($value['content_types']) && is_array($value['content_types']) ? $value['content_types'] : $defaults['content_types']))),
+            'post_statuses' => array_values(array_filter(array_map('sanitize_key', isset($value['post_statuses']) && is_array($value['post_statuses']) ? $value['post_statuses'] : $defaults['post_statuses']))),
             'networks' => [],
         ];
 
@@ -107,9 +123,8 @@ class ACE_Admin {
                 'app_secret' => sanitize_text_field($network_value['app_secret'] ?? ''),
                 'client_id' => sanitize_text_field($network_value['client_id'] ?? ''),
                 'client_secret' => sanitize_text_field($network_value['client_secret'] ?? ''),
-                'api_key' => sanitize_text_field($network_value['api_key'] ?? ''),
-                'api_secret' => sanitize_text_field($network_value['api_secret'] ?? ''),
                 'access_token' => sanitize_text_field($network_value['access_token'] ?? ''),
+                'refresh_token' => sanitize_text_field($network_value['refresh_token'] ?? ''),
             ];
         }
 
@@ -122,13 +137,17 @@ class ACE_Admin {
 
         foreach ($settings['networks'] as $network_key => $network) {
             $has_identity = !empty($network['account_name']);
-            $has_secret = !empty($network['access_token']) || !empty($network['app_secret']) || !empty($network['client_secret']) || !empty($network['api_secret']);
+            $has_key = !empty($network['app_id']) || !empty($network['client_id']);
+            $has_secret = !empty($network['access_token']) || !empty($network['app_secret']) || !empty($network['client_secret']) || !empty($network['refresh_token']);
+            $configured = $has_identity || $has_key || $has_secret;
 
             $statuses[$network_key] = [
-                'configured' => $has_identity || $has_secret,
-                'status' => ($has_identity || $has_secret) ? 'Configured' : 'Not configured',
+                'configured' => $configured,
+                'status' => $configured ? 'Configured' : 'Not configured',
             ];
         }
+
+        $statuses['x'] = array_merge($statuses['x'], ACE_Provider_X::get_connection_status());
 
         return $statuses;
     }
@@ -138,13 +157,31 @@ class ACE_Admin {
         $time = $settings['default_publish_time'];
 
         return [
-            ['day' => 'Mon', 'date' => 'Planning', 'items' => [['time' => $time, 'title' => 'Editorial planning block', 'network' => 'Internal']]],
-            ['day' => 'Tue', 'date' => 'Drafts', 'items' => [['time' => $time, 'title' => 'Product teaser draft', 'network' => 'LinkedIn']]],
-            ['day' => 'Wed', 'date' => 'Review', 'items' => [['time' => $time, 'title' => 'Campaign review and approvals', 'network' => 'Facebook']]],
-            ['day' => 'Thu', 'date' => 'Publish', 'items' => [['time' => $time, 'title' => 'Launch post slot', 'network' => 'Instagram']]],
-            ['day' => 'Fri', 'date' => 'Recycle', 'items' => [['time' => $time, 'title' => 'Evergreen repost window', 'network' => 'X']]],
-            ['day' => 'Sat', 'date' => 'Queue', 'items' => []],
-            ['day' => 'Sun', 'date' => 'Buffer', 'items' => []],
+            ['day' => 'Mon', 'date' => '24 Mar', 'items' => [['time' => $time, 'title' => 'Match reaction post', 'network' => 'X', 'status' => 'Scheduled']]],
+            ['day' => 'Tue', 'date' => '25 Mar', 'items' => [['time' => $time, 'title' => 'LinkedIn promo variant', 'network' => 'LinkedIn', 'status' => 'Awaiting approval']]],
+            ['day' => 'Wed', 'date' => '26 Mar', 'items' => [['time' => $time, 'title' => 'Newsletter support post', 'network' => 'Facebook', 'status' => 'Drafted']]],
+            ['day' => 'Thu', 'date' => '27 Mar', 'items' => [['time' => $time, 'title' => 'Evergreen tutorial reshare', 'network' => 'X', 'status' => 'Scheduled']]],
+            ['day' => 'Fri', 'date' => '28 Mar', 'items' => [['time' => $time, 'title' => 'Weekend teaser post', 'network' => 'Instagram', 'status' => 'Approved']]],
+            ['day' => 'Sat', 'date' => '29 Mar', 'items' => []],
+            ['day' => 'Sun', 'date' => '30 Mar', 'items' => []],
+        ];
+    }
+
+    public static function get_admin_bootstrap_data() {
+        $settings = self::get_settings();
+        $statuses = self::get_network_statuses($settings);
+
+        return [
+            'restBase' => rest_url('ace-social/v1/'),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'settings' => $settings,
+            'networkStatuses' => $statuses,
+            'calendar' => self::get_calendar_preview($settings),
+            'hasApiKey' => get_option('ace_openai_key', '') !== '',
+            'notices' => [
+                'success' => ACE_Provider_X::pop_notice('success'),
+                'error' => ACE_Provider_X::pop_notice('error'),
+            ],
         ];
     }
 
@@ -168,16 +205,7 @@ class ACE_Admin {
             true
         );
 
-        $settings = self::get_settings();
-
-        wp_localize_script('ace-social-planner-admin', 'aceSocialPlanner', [
-            'restBase' => rest_url('ace-social/v1/'),
-            'nonce' => wp_create_nonce('wp_rest'),
-            'settings' => $settings,
-            'networkStatuses' => self::get_network_statuses($settings),
-            'calendar' => self::get_calendar_preview($settings),
-            'hasApiKey' => get_option('ace_openai_key', '') !== '',
-        ]);
+        wp_localize_script('ace-social-planner-admin', 'aceSocialPlanner', self::get_admin_bootstrap_data());
     }
 
     private static function merge_settings($defaults, $saved) {

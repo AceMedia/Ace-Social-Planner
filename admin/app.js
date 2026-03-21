@@ -13,8 +13,8 @@
 
     const tabs = [
         { key: 'overview', label: 'Overview' },
-        { key: 'calendar', label: 'Calendar' },
-        { key: 'accounts', label: 'Accounts' },
+        { key: 'calendar', label: 'Scheduler' },
+        { key: 'accounts', label: 'Connections' },
         { key: 'ai', label: 'AI' },
     ];
 
@@ -69,61 +69,100 @@
                 return el('div', { className: 'ace-social-planner-event', key: index }, [
                     el('span', { className: 'ace-social-planner-event__time', key: 'time' }, item.time),
                     el('strong', { className: 'ace-social-planner-event__title', key: 'title' }, item.title),
-                    el('span', { className: 'ace-social-planner-event__network', key: 'network' }, item.network),
+                    el('span', { className: 'ace-social-planner-event__network', key: 'network' }, item.network + ' · ' + item.status),
                 ]);
-            }) : el('div', { className: 'ace-social-planner-event ace-social-planner-event--empty' }, 'No scheduled items')),
+            }) : el('div', { className: 'ace-social-planner-event ace-social-planner-event--empty' }, 'No scheduled posts')),
         ]);
     }
 
     function SettingField(props) {
         return el('label', { className: 'ace-social-planner-field' }, [
             el('span', { className: 'ace-social-planner-field__label', key: 'label' }, props.label),
-            el('input', {
-                key: 'input',
-                type: props.type || 'text',
-                value: props.value || '',
-                onChange: function (event) { props.onChange(event.target.value); },
-                placeholder: props.placeholder || '',
-            }),
+            props.type === 'textarea'
+                ? el('textarea', {
+                    key: 'input',
+                    rows: props.rows || 4,
+                    value: props.value || '',
+                    onChange: function (event) { props.onChange(event.target.value); },
+                    placeholder: props.placeholder || '',
+                })
+                : el(props.type === 'select' ? 'select' : 'input', Object.assign({
+                    key: 'input',
+                    value: props.value || '',
+                    onChange: function (event) { props.onChange(event.target.value); },
+                }, props.type === 'select'
+                    ? {}
+                    : { type: props.type || 'text', placeholder: props.placeholder || '' }), props.type === 'select'
+                    ? (props.options || []).map(function (option) {
+                        return el('option', { key: option.value, value: option.value }, option.label);
+                    })
+                    : null),
         ]);
     }
 
-    function NetworkCard(props) {
+    function AccountCard(props) {
         const network = props.network;
         const status = props.status || { configured: false, status: 'Not configured' };
+        const actions = [];
+
+        if (props.networkKey === 'x') {
+            actions.push(el('button', {
+                key: 'connect',
+                type: 'button',
+                className: 'button button-secondary',
+                onClick: props.onConnect,
+                disabled: props.isBusy,
+            }, status.connected ? 'Reconnect X' : 'Connect X'));
+
+            if (status.connected) {
+                actions.push(el('button', {
+                    key: 'disconnect',
+                    type: 'button',
+                    className: 'button button-link-delete',
+                    onClick: props.onDisconnect,
+                    disabled: props.isBusy,
+                }, 'Disconnect'));
+            }
+        }
 
         return el('div', { className: 'ace-social-planner-panel ace-social-planner-network' }, [
             el('div', { className: 'ace-social-planner-network__heading', key: 'heading' }, [
                 el('h3', { key: 'title' }, network.label),
                 el('span', {
                     key: 'status',
-                    className: 'ace-social-planner-badge' + (status.configured ? ' is-ready' : ''),
+                    className: 'ace-social-planner-badge' + (status.connected || status.configured ? ' is-ready' : ''),
                 }, status.status),
             ]),
+            props.networkKey === 'x' ? el('div', { className: 'ace-social-planner-callout ace-social-planner-callout--x', key: 'callout' }, [
+                el('strong', { key: 'title' }, 'X OAuth callback'),
+                el('code', { key: 'code' }, status.callback_url || ''),
+                el('p', { key: 'text' }, 'Set this exact callback URL in your X developer app. PKCE is used for approval and the user account is verified after return.'),
+            ]) : null,
             el(SettingField, {
                 key: 'account_name',
-                label: 'Account Name',
+                label: 'Account Label',
                 value: network.account_name,
                 onChange: function (value) { props.onChange('account_name', value); },
-                placeholder: 'Brand account or profile name',
+                placeholder: 'Internal label for this social account',
             }),
+            network.client_id !== undefined ? el(SettingField, {
+                key: 'client_id',
+                label: props.networkKey === 'x' ? 'OAuth Client ID' : 'Client ID',
+                value: network.client_id,
+                onChange: function (value) { props.onChange('client_id', value); },
+            }) : null,
+            network.client_secret !== undefined ? el(SettingField, {
+                key: 'client_secret',
+                type: 'password',
+                label: props.networkKey === 'x' ? 'Client Secret (optional for now)' : 'Client Secret',
+                value: network.client_secret,
+                onChange: function (value) { props.onChange('client_secret', value); },
+            }) : null,
             network.app_id !== undefined ? el(SettingField, {
                 key: 'app_id',
                 label: 'App ID',
                 value: network.app_id,
                 onChange: function (value) { props.onChange('app_id', value); },
-            }) : null,
-            network.client_id !== undefined ? el(SettingField, {
-                key: 'client_id',
-                label: 'Client ID',
-                value: network.client_id,
-                onChange: function (value) { props.onChange('client_id', value); },
-            }) : null,
-            network.api_key !== undefined ? el(SettingField, {
-                key: 'api_key',
-                label: 'API Key',
-                value: network.api_key,
-                onChange: function (value) { props.onChange('api_key', value); },
             }) : null,
             network.app_secret !== undefined ? el(SettingField, {
                 key: 'app_secret',
@@ -132,28 +171,8 @@
                 value: network.app_secret,
                 onChange: function (value) { props.onChange('app_secret', value); },
             }) : null,
-            network.client_secret !== undefined ? el(SettingField, {
-                key: 'client_secret',
-                type: 'password',
-                label: 'Client Secret',
-                value: network.client_secret,
-                onChange: function (value) { props.onChange('client_secret', value); },
-            }) : null,
-            network.api_secret !== undefined ? el(SettingField, {
-                key: 'api_secret',
-                type: 'password',
-                label: 'API Secret',
-                value: network.api_secret,
-                onChange: function (value) { props.onChange('api_secret', value); },
-            }) : null,
-            el(SettingField, {
-                key: 'access_token',
-                type: 'password',
-                label: 'Access Token',
-                value: network.access_token,
-                onChange: function (value) { props.onChange('access_token', value); },
-                placeholder: 'Optional until direct verification is added',
-            }),
+            el('div', { className: 'ace-social-planner-actions ace-social-planner-actions--tight', key: 'actions' }, actions),
+            props.networkKey === 'x' && status.connected ? el('p', { className: 'description', key: 'connected' }, 'Connected as @' + (status.username || '') + (status.connected_at ? ' on ' + status.connected_at : '') + '.') : null,
         ]);
     }
 
@@ -164,11 +183,12 @@
         const [calendar, setCalendar] = useState(clone(config.calendar || []));
         const [apiKey, setApiKey] = useState('');
         const [sourceContent, setSourceContent] = useState('');
-        const [aiOutput, setAiOutput] = useState('AI suggestions stay optional. Add a key only when you want generation.');
-        const [notice, setNotice] = useState('');
-        const [error, setError] = useState('');
+        const [aiOutput, setAiOutput] = useState('AI suggestions remain optional. Use them when you want stronger platform-specific drafts.');
+        const [notice, setNotice] = useState(config.notices && config.notices.success ? config.notices.success : '');
+        const [error, setError] = useState(config.notices && config.notices.error ? config.notices.error : '');
         const [isSaving, setIsSaving] = useState(false);
         const [isGenerating, setIsGenerating] = useState(false);
+        const [isConnectingX, setIsConnectingX] = useState(false);
         const hasApiKey = !!config.hasApiKey;
 
         function updateSetting(key, value) {
@@ -187,6 +207,13 @@
             });
         }
 
+        function applyBootstrap(data) {
+            setSettings(clone(data.settings));
+            setStatuses(clone(data.networkStatuses));
+            setCalendar(clone(data.calendar));
+            config.hasApiKey = data.hasApiKey;
+        }
+
         function saveSettings() {
             setIsSaving(true);
             setNotice('');
@@ -200,10 +227,7 @@
                 }),
             })
                 .then(function (data) {
-                    setSettings(clone(data.settings));
-                    setStatuses(clone(data.networkStatuses));
-                    setCalendar(clone(data.calendar));
-                    config.hasApiKey = data.hasApiKey;
+                    applyBootstrap(data);
                     setApiKey('');
                     setNotice('Settings saved.');
                 })
@@ -215,6 +239,42 @@
                 });
         }
 
+        function connectX() {
+            setIsConnectingX(true);
+            setError('');
+            setNotice('');
+
+            request('providers/x/connect-url', { method: 'GET' })
+                .then(function (data) {
+                    window.location.href = data.authorizeUrl;
+                })
+                .catch(function (requestError) {
+                    setError(requestError.message);
+                    setIsConnectingX(false);
+                });
+        }
+
+        function disconnectX() {
+            setIsConnectingX(true);
+            setError('');
+            setNotice('');
+
+            request('providers/x/disconnect', { method: 'POST', body: JSON.stringify({}) })
+                .then(function () {
+                    return request('settings', { method: 'GET' });
+                })
+                .then(function (data) {
+                    applyBootstrap(data);
+                    setNotice('X connection removed.');
+                })
+                .catch(function (requestError) {
+                    setError(requestError.message);
+                })
+                .finally(function () {
+                    setIsConnectingX(false);
+                });
+        }
+
         function generateDraft() {
             if (!sourceContent.trim()) {
                 setError('Add some source content before asking for AI suggestions.');
@@ -223,7 +283,7 @@
             }
 
             if (!config.hasApiKey) {
-                setError('The interface is ready without AI. Add an OpenAI key in the AI tab only when you want suggestions.');
+                setError('The scheduler works without AI. Add an OpenAI key only when you want AI draft suggestions.');
                 setActiveTab('ai');
                 return;
             }
@@ -252,14 +312,18 @@
 
         const networkKeys = Object.keys(settings.networks || {});
         const configuredCount = networkKeys.filter(function (key) {
-            return statuses[key] && statuses[key].configured;
+            return statuses[key] && (statuses[key].configured || statuses[key].connected);
         }).length;
+        const scheduledCount = calendar.reduce(function (count, day) {
+            return count + day.items.length;
+        }, 0);
+        const xStatus = statuses.x || {};
 
         return el('div', { className: 'ace-social-planner-app' }, [
             el('header', { className: 'ace-social-planner-hero', key: 'hero' }, [
                 el('div', { key: 'copy' }, [
                     el('h1', { key: 'title' }, settings.workspace_name || 'ACE Social Planner'),
-                    el('p', { key: 'text' }, 'A WordPress-native planning surface for content scheduling, account setup, and optional AI-assisted copy work.'),
+                    el('p', { key: 'text' }, 'A WordPress-native social scheduler for queueing posts, managing social connections, and layering AI suggestions in when they are useful.'),
                 ]),
                 el('div', { className: 'ace-social-planner-hero__actions', key: 'actions' }, [
                     el('button', {
@@ -270,11 +334,12 @@
                         disabled: isSaving,
                     }, isSaving ? 'Saving...' : 'Save Settings'),
                     el('button', {
-                        key: 'calendar',
+                        key: 'x',
                         type: 'button',
                         className: 'button',
-                        onClick: function () { setActiveTab('calendar'); },
-                    }, 'Open Calendar'),
+                        onClick: connectX,
+                        disabled: isConnectingX,
+                    }, xStatus.connected ? 'Reconnect X' : 'Connect X'),
                 ]),
             ]),
             notice ? el('div', { className: 'notice notice-success inline', key: 'notice' }, el('p', null, notice)) : null,
@@ -289,14 +354,14 @@
             })),
             activeTab === 'overview' ? el(Fragment, { key: 'overview' }, [
                 el('div', { className: 'ace-social-planner-metrics' }, [
-                    el(MetricCard, { label: 'Configured Networks', value: String(configuredCount), hint: 'Saved account credentials or tokens' }),
-                    el(MetricCard, { label: 'Planner Timezone', value: settings.default_timezone || 'UTC', hint: 'Default schedule timezone' }),
-                    el(MetricCard, { label: 'Default Publish Time', value: settings.default_publish_time || '09:00', hint: 'Used for preview schedule blocks' }),
-                    el(MetricCard, { label: 'AI Suggestions', value: config.hasApiKey ? 'Enabled' : 'Optional', hint: config.hasApiKey ? 'OpenAI key saved' : 'Interface works without AI' }),
+                    el(MetricCard, { label: 'Connected Networks', value: String(configuredCount), hint: 'Accounts ready for scheduling' }),
+                    el(MetricCard, { label: 'Scheduled Posts', value: String(scheduledCount), hint: 'Visible in the weekly scheduler preview' }),
+                    el(MetricCard, { label: 'Default Send Time', value: settings.default_publish_time || '09:00', hint: 'Applied to new scheduled slots' }),
+                    el(MetricCard, { label: 'X Connection', value: xStatus.connected ? '@' + (xStatus.username || 'connected') : 'Pending', hint: xStatus.connected ? 'User approval completed' : 'Set client ID then approve the app' }),
                 ]),
                 el('div', { className: 'ace-social-planner-layout ace-social-planner-layout--two' }, [
                     el('section', { className: 'ace-social-planner-panel', key: 'workspace' }, [
-                        el('h2', null, 'Workspace Settings'),
+                        el('h2', null, 'Scheduler Defaults'),
                         el(SettingField, {
                             label: 'Workspace Name',
                             value: settings.workspace_name,
@@ -308,38 +373,37 @@
                             onChange: function (value) { updateSetting('default_timezone', value); },
                         }),
                         el(SettingField, {
-                            label: 'Default Publish Time',
+                            label: 'Default Schedule Time',
                             value: settings.default_publish_time,
                             onChange: function (value) { updateSetting('default_publish_time', value); },
                             placeholder: '09:00',
                         }),
-                        el('label', { className: 'ace-social-planner-field' }, [
-                            el('span', { className: 'ace-social-planner-field__label', key: 'label' }, 'Week Starts On'),
-                            el('select', {
-                                key: 'select',
-                                value: settings.week_starts_on,
-                                onChange: function (event) { updateSetting('week_starts_on', event.target.value); },
-                            }, [
-                                el('option', { value: 'monday', key: 'monday' }, 'Monday'),
-                                el('option', { value: 'sunday', key: 'sunday' }, 'Sunday'),
-                            ]),
-                        ]),
+                        el(SettingField, {
+                            label: 'Week Starts On',
+                            type: 'select',
+                            value: settings.week_starts_on,
+                            onChange: function (value) { updateSetting('week_starts_on', value); },
+                            options: [
+                                { value: 'monday', label: 'Monday' },
+                                { value: 'sunday', label: 'Sunday' },
+                            ],
+                        }),
                     ]),
-                    el('section', { className: 'ace-social-planner-panel', key: 'roadmap' }, [
-                        el('h2', null, 'Planner Direction'),
+                    el('section', { className: 'ace-social-planner-panel', key: 'queue' }, [
+                        el('h2', null, 'Queue Focus'),
                         el('ul', { className: 'ace-social-planner-list' }, [
-                            el('li', { key: '1' }, 'Use this screen as the home for planning, accounts, and approvals.'),
-                            el('li', { key: '2' }, 'Keep AI optional so the application is still useful before any model is configured.'),
-                            el('li', { key: '3' }, 'Treat account setup and scheduling as core product surfaces.'),
-                            el('li', { key: '4' }, 'Layer publishing and analytics in after the planner workflow is stable.'),
+                            el('li', { key: '1' }, 'The calendar is a scheduler for social posts, not an editorial planner.'),
+                            el('li', { key: '2' }, 'Connection approval comes first so scheduling can target real accounts.'),
+                            el('li', { key: '3' }, 'X is the first provider path and should become the pattern for later networks.'),
+                            el('li', { key: '4' }, 'AI remains optional and should support the queue, not define the app.'),
                         ]),
                     ]),
                 ]),
             ]) : null,
             activeTab === 'calendar' ? el('section', { className: 'ace-social-planner-panel', key: 'calendar' }, [
                 el('div', { className: 'ace-social-planner-panel__header', key: 'header' }, [
-                    el('h2', { key: 'title' }, 'Calendar Preview'),
-                    el('p', { key: 'text' }, 'A planning-first weekly view that will later connect to stored drafts, queue items, and approvals.'),
+                    el('h2', { key: 'title' }, 'Social Scheduler'),
+                    el('p', { key: 'text' }, 'This weekly view represents scheduled social posts and queue slots, similar to a lightweight Buffer-style scheduler inside WordPress.'),
                 ]),
                 el('div', { className: 'ace-social-planner-calendar' }, calendar.map(function (day, index) {
                     return el(CalendarColumn, { day: day, key: index });
@@ -347,18 +411,22 @@
             ]) : null,
             activeTab === 'accounts' ? el(Fragment, { key: 'accounts' }, [
                 el('div', { className: 'ace-social-planner-layout ace-social-planner-layout--accounts' }, networkKeys.map(function (networkKey) {
-                    return el(NetworkCard, {
+                    return el(AccountCard, {
                         key: networkKey,
+                        networkKey: networkKey,
                         network: settings.networks[networkKey],
                         status: statuses[networkKey],
+                        isBusy: isConnectingX && networkKey === 'x',
                         onChange: function (field, value) { updateNetwork(networkKey, field, value); },
+                        onConnect: connectX,
+                        onDisconnect: disconnectX,
                     });
                 })),
             ]) : null,
             activeTab === 'ai' ? el('div', { className: 'ace-social-planner-layout ace-social-planner-layout--two', key: 'ai' }, [
                 el('section', { className: 'ace-social-planner-panel', key: 'settings' }, [
                     el('h2', null, 'AI Settings'),
-                    el('p', null, 'This is optional. The planner UI works without it.'),
+                    el('p', null, 'AI supports stronger copy suggestions for queued social posts but should never be required for scheduling or connections.'),
                     el(SettingField, {
                         label: 'OpenAI API Key',
                         type: 'password',
@@ -369,17 +437,15 @@
                     el('p', { className: 'description' }, hasApiKey ? 'A server-side key is already saved.' : 'No API key saved yet.'),
                 ]),
                 el('section', { className: 'ace-social-planner-panel', key: 'generator' }, [
-                    el('h2', null, 'Suggestion Drafting'),
-                    el('label', { className: 'ace-social-planner-field' }, [
-                        el('span', { className: 'ace-social-planner-field__label', key: 'label' }, 'Source Content'),
-                        el('textarea', {
-                            key: 'textarea',
-                            rows: 8,
-                            value: sourceContent,
-                            onChange: function (event) { setSourceContent(event.target.value); },
-                            placeholder: 'Paste post notes, campaign ideas, or article copy when you want suggestions.',
-                        }),
-                    ]),
+                    el('h2', null, 'Social Draft Suggestions'),
+                    el(SettingField, {
+                        label: 'Source Content',
+                        type: 'textarea',
+                        rows: 8,
+                        value: sourceContent,
+                        onChange: setSourceContent,
+                        placeholder: 'Paste post notes, excerpt text, or a published article summary.',
+                    }),
                     el('div', { className: 'ace-social-planner-actions' }, [
                         el('button', {
                             type: 'button',

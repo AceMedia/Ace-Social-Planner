@@ -13,6 +13,7 @@ if (!defined('ABSPATH')) {
 require_once plugin_dir_path(__FILE__) . 'includes/class-ai.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-api.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-admin.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-provider-x.php';
 
 class ACE_Social_Planner {
 
@@ -21,6 +22,7 @@ class ACE_Social_Planner {
         add_action('admin_menu', ['ACE_Admin', 'register_menu']);
         add_action('admin_init', ['ACE_Admin', 'register_settings']);
         add_action('admin_enqueue_scripts', ['ACE_Admin', 'enqueue_assets']);
+        add_action('admin_init', ['ACE_Admin', 'maybe_handle_oauth_callbacks']);
     }
 
     public function register_routes() {

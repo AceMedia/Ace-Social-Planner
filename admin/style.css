@@ -27,15 +27,20 @@
 
 .ace-social-planner-hero p {
     margin: 0;
-    max-width: 720px;
+    max-width: 760px;
     color: #3c434a;
     font-size: 15px;
 }
 
-.ace-social-planner-hero__actions {
+.ace-social-planner-hero__actions,
+.ace-social-planner-actions {
     display: flex;
     gap: 12px;
     flex-wrap: wrap;
+}
+
+.ace-social-planner-actions--tight {
+    margin-top: 8px;
 }
 
 .ace-social-planner-tabs {
@@ -103,7 +108,7 @@
 }
 
 .ace-social-planner-layout--accounts {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 }
 
 .ace-social-planner-panel h2,
@@ -130,12 +135,6 @@
 .ace-social-planner-field select {
     width: 100%;
     margin-top: 6px;
-}
-
-.ace-social-planner-actions {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 14px;
 }
 
 .ace-social-planner-output {
@@ -219,6 +218,22 @@
 .ace-social-planner-badge.is-ready {
     background: #dff5e3;
     color: #0a5c24;
+}
+
+.ace-social-planner-callout {
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    background: #f6f7f7;
+    padding: 12px;
+    margin-bottom: 14px;
+}
+
+.ace-social-planner-callout code {
+    display: block;
+    margin: 8px 0;
+    padding: 8px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 @media (max-width: 782px) {

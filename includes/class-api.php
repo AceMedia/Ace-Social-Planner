@@ -32,6 +32,18 @@ class ACE_API {
                 'permission_callback' => [__CLASS__, 'can_manage_plugin'],
             ],
         ]);
+
+        register_rest_route('ace-social/v1', '/providers/x/connect-url', [
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => [__CLASS__, 'get_x_connect_url'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
+
+        register_rest_route('ace-social/v1', '/providers/x/disconnect', [
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => [__CLASS__, 'disconnect_x'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
     }
 
     public static function can_manage_plugin() {
@@ -43,14 +55,7 @@ class ACE_API {
     }
 
     public static function get_settings() {
-        $settings = ACE_Admin::get_settings();
-
-        return rest_ensure_response([
-            'settings' => $settings,
-            'networkStatuses' => ACE_Admin::get_network_statuses($settings),
-            'calendar' => ACE_Admin::get_calendar_preview($settings),
-            'hasApiKey' => get_option('ace_openai_key', '') !== '',
-        ]);
+        return rest_ensure_response(ACE_Admin::get_admin_bootstrap_data());
     }
 
     public static function update_settings(WP_REST_Request $request) {
@@ -67,6 +72,23 @@ class ACE_API {
         }
 
         return self::get_settings();
+    }
+
+    public static function get_x_connect_url() {
+        $url = ACE_Provider_X::get_authorize_url(get_current_user_id());
+
+        if (is_wp_error($url)) {
+            return $url;
+        }
+
+        return rest_ensure_response([
+            'authorizeUrl' => $url,
+            'connection' => ACE_Provider_X::get_connection_status(),
+        ]);
+    }
+
+    public static function disconnect_x() {
+        return rest_ensure_response(ACE_Provider_X::disconnect());
     }
 
     public static function generate_ai(WP_REST_Request $request) {
