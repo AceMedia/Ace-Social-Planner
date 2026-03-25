@@ -36,6 +36,7 @@ class ACE_Admin {
 
     public static function maybe_handle_oauth_callbacks() {
         ACE_Provider_X::handle_callback();
+        ACE_Provider_Facebook::handle_callback();
     }
 
     public static function sanitize_api_key($value) {
@@ -143,12 +144,17 @@ class ACE_Admin {
         }
 
         $statuses['x'] = array_merge($statuses['x'], ACE_Provider_X::get_connection_status());
+        $statuses['facebook'] = array_merge($statuses['facebook'], ACE_Provider_Facebook::get_connection_status());
 
         return $statuses;
     }
 
     public static function get_admin_bootstrap_data() {
         $settings = self::get_settings();
+        $x_success_notice = ACE_Provider_X::pop_notice('success');
+        $facebook_success_notice = ACE_Provider_Facebook::pop_notice('success');
+        $x_error_notice = ACE_Provider_X::pop_notice('error');
+        $facebook_error_notice = ACE_Provider_Facebook::pop_notice('error');
 
         return [
             'restBase' => rest_url('ace-social/v1/'),
@@ -158,8 +164,8 @@ class ACE_Admin {
             'plannerItems' => ACE_Planner::get_items(),
             'hasApiKey' => get_option('ace_openai_key', '') !== '',
             'notices' => [
-                'success' => ACE_Provider_X::pop_notice('success'),
-                'error' => ACE_Provider_X::pop_notice('error'),
+                'success' => $x_success_notice !== '' ? $x_success_notice : $facebook_success_notice,
+                'error' => $x_error_notice !== '' ? $x_error_notice : $facebook_error_notice,
             ],
         ];
     }

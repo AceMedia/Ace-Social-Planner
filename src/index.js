@@ -213,18 +213,25 @@ function EventModal({ eventDraft, onClose, onSave, onDelete }) {
 
 function App() {
     const [settings, setSettings] = useState(clone(config.settings || {}));
+    const [networkStatuses, setNetworkStatuses] = useState(clone(config.networkStatuses || {}));
     const [plannerItems, setPlannerItems] = useState(clone(config.plannerItems || []));
     const [notice, setNotice] = useState(config.notices?.success || '');
     const [error, setError] = useState(config.notices?.error || '');
     const [activeTab, setActiveTab] = useState('calendar');
     const [isSavingSettings, setIsSavingSettings] = useState(false);
     const [isConnectingX, setIsConnectingX] = useState(false);
+    const [isConnectingFacebook, setIsConnectingFacebook] = useState(false);
+    const [isPublishingX, setIsPublishingX] = useState(false);
+    const [isPublishingFacebook, setIsPublishingFacebook] = useState(false);
     const [eventDraft, setEventDraft] = useState(null);
     const [apiKey, setApiKey] = useState('');
     const [sourceContent, setSourceContent] = useState('');
     const [aiOutput, setAiOutput] = useState('AI suggestions remain optional. Use them when you want stronger platform-specific drafts.');
     const [isGenerating, setIsGenerating] = useState(false);
-    const statuses = config.networkStatuses || {};
+    const [xTestText, setXTestText] = useState('Testing ACE Social Planner -> X.');
+    const [facebookTestMessage, setFacebookTestMessage] = useState('Testing ACE Social Planner -> Facebook Page.');
+    const [facebookTestLink, setFacebookTestLink] = useState('');
+    const statuses = networkStatuses || {};
     const hasApiKey = !!config.hasApiKey;
 
     const events = useMemo(
@@ -247,6 +254,7 @@ function App() {
         config.networkStatuses = data.networkStatuses || config.networkStatuses;
         config.hasApiKey = data.hasApiKey;
         setSettings(clone(data.settings));
+        setNetworkStatuses(clone(data.networkStatuses || config.networkStatuses || {}));
         setPlannerItems(clone(data.plannerItems || []));
     }
 
@@ -296,6 +304,87 @@ function App() {
             })
             .catch((requestError) => setError(requestError.message))
             .finally(() => setIsConnectingX(false));
+    }
+
+    function connectFacebook() {
+        setIsConnectingFacebook(true);
+        setNotice('');
+        setError('');
+
+        request('providers/facebook/connect-url', { method: 'GET' })
+            .then((data) => {
+                window.location.href = data.authorizeUrl;
+            })
+            .catch((requestError) => {
+                setError(requestError.message);
+                setIsConnectingFacebook(false);
+            });
+    }
+
+    function disconnectFacebook() {
+        setIsConnectingFacebook(true);
+        setNotice('');
+        setError('');
+
+        request('providers/facebook/disconnect', { method: 'POST', body: JSON.stringify({}) })
+            .then(() => request('settings', { method: 'GET' }))
+            .then((data) => {
+                refreshBootstrap(data);
+                setNotice('Facebook connection removed.');
+            })
+            .catch((requestError) => setError(requestError.message))
+            .finally(() => setIsConnectingFacebook(false));
+    }
+
+    function selectFacebookPage(pageId) {
+        setNotice('');
+        setError('');
+
+        request('providers/facebook/select-page', {
+            method: 'POST',
+            body: JSON.stringify({ pageId }),
+        })
+            .then(() => request('settings', { method: 'GET' }))
+            .then((data) => {
+                refreshBootstrap(data);
+                setNotice('Facebook page selected.');
+            })
+            .catch((requestError) => setError(requestError.message));
+    }
+
+    function publishTestX() {
+        setNotice('');
+        setError('');
+        setIsPublishingX(true);
+
+        request('providers/x/publish-test', {
+            method: 'POST',
+            body: JSON.stringify({ text: xTestText }),
+        })
+            .then((data) => {
+                setNotice('Posted test tweet ' + data.tweetId + '.');
+            })
+            .catch((requestError) => setError(requestError.message))
+            .finally(() => setIsPublishingX(false));
+    }
+
+    function publishTestFacebook() {
+        setNotice('');
+        setError('');
+        setIsPublishingFacebook(true);
+
+        request('providers/facebook/publish-test', {
+            method: 'POST',
+            body: JSON.stringify({
+                message: facebookTestMessage,
+                link: facebookTestLink,
+            }),
+        })
+            .then((data) => {
+                setNotice('Posted to Facebook page ' + data.pageName + '. Post ID: ' + data.postId + '.');
+            })
+            .catch((requestError) => setError(requestError.message))
+            .finally(() => setIsPublishingFacebook(false));
     }
 
     function handleDraftChange(nextDraft, silent) {
@@ -419,15 +508,97 @@ function App() {
             }),
         ]) : null,
         activeTab === 'accounts' ? createElement('section', { className: 'ace-social-planner-panel', key: 'accounts' }, [
-            createElement('h2', { key: 'title' }, 'X Connection'),
-            createElement(TextControl, {
-                key: 'x-client-id',
-                label: 'X OAuth Client ID',
-                value: settings.networks?.x?.client_id || '',
-                onChange: (value) => setSettings((current) => ({ ...current, networks: { ...current.networks, x: { ...current.networks.x, client_id: value } } })),
-            }),
-            createElement('p', { key: 'callback', className: 'description' }, 'Callback URL: ' + (statuses.x?.callback_url || '')),            
-            createElement('p', { key: 'status', className: 'description' }, statuses.x?.connected ? 'Connected as @' + statuses.x.username : 'Save settings, then click Connect X.'),
+            createElement('h2', { key: 'title' }, 'Connections and Posting'),
+            createElement('p', { key: 'intro', className: 'description' }, 'Goal: save credentials once, click connect, approve in the social platform, and run a real test post from WordPress.'),
+            createElement('div', { key: 'x-card', className: 'ace-social-planner-network-card' }, [
+                createElement('h3', { key: 'x-heading' }, 'X (Twitter)'),
+                createElement(TextControl, {
+                    key: 'x-client-id',
+                    label: 'OAuth Client ID',
+                    value: settings.networks?.x?.client_id || '',
+                    onChange: (value) => setSettings((current) => ({ ...current, networks: { ...current.networks, x: { ...current.networks.x, client_id: value } } })),
+                }),
+                createElement('p', { key: 'x-callback', className: 'description' }, 'Callback URL: ' + (statuses.x?.callback_url || '')),
+                createElement('p', { key: 'x-help-1', className: 'description' }, createElement('a', { href: 'https://developer.x.com/en/portal/dashboard', target: '_blank', rel: 'noreferrer noopener' }, 'Create/manage X app in Developer Portal')),
+                createElement('p', { key: 'x-help-2', className: 'description' }, createElement('a', { href: 'https://developer.x.com/en/docs/authentication/oauth-2-0/authorization-code', target: '_blank', rel: 'noreferrer noopener' }, 'X OAuth 2.0 Authorization Code + PKCE guide')),
+                createElement('p', { key: 'x-status', className: 'description' }, statuses.x?.connected ? 'Connected as @' + statuses.x.username : 'Save settings, then click Connect X.'),
+                createElement('div', { key: 'x-actions', className: 'ace-social-planner-inline-actions' }, [
+                    createElement(Button, { key: 'x-connect', variant: 'secondary', onClick: connectX, disabled: isConnectingX }, statuses.x?.connected ? 'Reconnect X' : 'Connect X'),
+                    statuses.x?.connected ? createElement(Button, { key: 'x-disconnect', variant: 'tertiary', isDestructive: true, onClick: disconnectX, disabled: isConnectingX }, 'Disconnect X') : null,
+                ]),
+                createElement(TextareaControl, {
+                    key: 'x-test-text',
+                    label: 'Test post text for X',
+                    value: xTestText,
+                    onChange: setXTestText,
+                }),
+                createElement(Button, {
+                    key: 'x-test-publish',
+                    variant: 'primary',
+                    onClick: publishTestX,
+                    disabled: isPublishingX || !statuses.x?.connected,
+                }, isPublishingX ? 'Posting to X...' : 'Send Test Post to X'),
+            ]),
+            createElement('div', { key: 'facebook-card', className: 'ace-social-planner-network-card' }, [
+                createElement('h3', { key: 'facebook-heading' }, 'Facebook'),
+                createElement(TextControl, {
+                    key: 'facebook-app-id',
+                    label: 'App ID',
+                    value: settings.networks?.facebook?.app_id || '',
+                    onChange: (value) => setSettings((current) => ({ ...current, networks: { ...current.networks, facebook: { ...current.networks.facebook, app_id: value } } })),
+                }),
+                createElement(TextControl, {
+                    key: 'facebook-app-secret',
+                    label: 'App Secret',
+                    type: 'password',
+                    value: settings.networks?.facebook?.app_secret || '',
+                    onChange: (value) => setSettings((current) => ({ ...current, networks: { ...current.networks, facebook: { ...current.networks.facebook, app_secret: value } } })),
+                }),
+                createElement('p', { key: 'facebook-callback', className: 'description' }, 'Callback URL: ' + (statuses.facebook?.callback_url || '')),
+                createElement('p', { key: 'facebook-help-1', className: 'description' }, createElement('a', { href: 'https://developers.facebook.com/apps/', target: '_blank', rel: 'noreferrer noopener' }, 'Create/manage Facebook app in Meta for Developers')),
+                createElement('p', { key: 'facebook-help-2', className: 'description' }, createElement('a', { href: 'https://developers.facebook.com/docs/permissions/reference/pages_manage_posts/', target: '_blank', rel: 'noreferrer noopener' }, 'Permission: pages_manage_posts')),
+                createElement('p', { key: 'facebook-help-3', className: 'description' }, createElement('a', { href: 'https://developers.facebook.com/docs/permissions/reference/pages_show_list/', target: '_blank', rel: 'noreferrer noopener' }, 'Permission: pages_show_list')),
+                createElement('p', { key: 'facebook-status', className: 'description' }, statuses.facebook?.connected
+                    ? 'Connected as ' + (statuses.facebook.name || 'Facebook user')
+                    : 'Save settings, then click Connect Facebook.'),
+                createElement('div', { key: 'facebook-actions', className: 'ace-social-planner-inline-actions' }, [
+                    createElement(Button, { key: 'facebook-connect', variant: 'secondary', onClick: connectFacebook, disabled: isConnectingFacebook }, statuses.facebook?.connected ? 'Reconnect Facebook' : 'Connect Facebook'),
+                    statuses.facebook?.connected ? createElement(Button, { key: 'facebook-disconnect', variant: 'tertiary', isDestructive: true, onClick: disconnectFacebook, disabled: isConnectingFacebook }, 'Disconnect Facebook') : null,
+                ]),
+                createElement(SelectControl, {
+                    key: 'facebook-page-select',
+                    label: 'Page to publish to',
+                    value: statuses.facebook?.selected_page_id || '',
+                    options: [{ label: statuses.facebook?.connected ? 'Select a Page' : 'Connect Facebook first', value: '' }]
+                        .concat((statuses.facebook?.pages || []).map((page) => ({ label: page.name, value: page.id }))),
+                    onChange: (value) => {
+                        if (value) {
+                            selectFacebookPage(value);
+                        }
+                    },
+                }),
+                createElement('p', { key: 'facebook-page-note', className: 'description' }, statuses.facebook?.profile_posting_supported
+                    ? 'Profile publishing is enabled for this app.'
+                    : 'Facebook API typically publishes to Pages, not personal profiles. Choose a Page above.'),
+                createElement(TextareaControl, {
+                    key: 'facebook-test-message',
+                    label: 'Test post message for Facebook',
+                    value: facebookTestMessage,
+                    onChange: setFacebookTestMessage,
+                }),
+                createElement(TextControl, {
+                    key: 'facebook-test-link',
+                    label: 'Optional link URL',
+                    value: facebookTestLink,
+                    onChange: setFacebookTestLink,
+                }),
+                createElement(Button, {
+                    key: 'facebook-test-publish',
+                    variant: 'primary',
+                    onClick: publishTestFacebook,
+                    disabled: isPublishingFacebook || !statuses.facebook?.connected || !statuses.facebook?.selected_page_id,
+                }, isPublishingFacebook ? 'Posting to Facebook...' : 'Send Test Post to Facebook Page'),
+            ]),
         ]) : null,
         activeTab === 'ai' ? createElement('section', { className: 'ace-social-planner-panel', key: 'ai' }, [
             createElement(TextControl, {

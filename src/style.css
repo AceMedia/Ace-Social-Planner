@@ -48,3 +48,18 @@
     gap: 8px;
     margin-top: 20px;
 }
+
+.ace-social-planner-network-card {
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+    background: #fff;
+}
+
+.ace-social-planner-inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}

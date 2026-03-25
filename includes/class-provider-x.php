@@ -154,6 +154,66 @@ class ACE_Provider_X {
         ];
     }
 
+    public static function publish_test($text) {
+        $text = sanitize_textarea_field((string) $text);
+
+        if ($text === '') {
+            return new WP_Error('ace_x_missing_text', 'Add post text before testing publish to X.', ['status' => 400]);
+        }
+
+        $connection = self::get_connection();
+
+        if (empty($connection['access_token']) || empty($connection['user_id'])) {
+            return new WP_Error('ace_x_not_connected', 'Connect X before testing publishing.', ['status' => 400]);
+        }
+
+        $response = wp_remote_post('https://api.x.com/2/tweets', [
+            'timeout' => 30,
+            'headers' => [
+                'Authorization' => 'Bearer ' . (string) $connection['access_token'],
+                'Content-Type' => 'application/json',
+            ],
+            'body' => wp_json_encode([
+                'text' => $text,
+            ]),
+        ]);
+
+        if (is_wp_error($response)) {
+            return new WP_Error('ace_x_publish_failed', $response->get_error_message(), ['status' => 502]);
+        }
+
+        $status_code = (int) wp_remote_retrieve_response_code($response);
+        $decoded = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($status_code === 401 && !empty($connection['refresh_token'])) {
+            $refreshed = self::refresh_access_token((string) $connection['refresh_token']);
+
+            if (!is_wp_error($refreshed)) {
+                $connection['access_token'] = (string) $refreshed['access_token'];
+                $connection['refresh_token'] = isset($refreshed['refresh_token'])
+                    ? (string) $refreshed['refresh_token']
+                    : (string) $connection['refresh_token'];
+                update_option(self::OPTION_CONNECTION, $connection, false);
+
+                return self::publish_test($text);
+            }
+        }
+
+        if ($status_code < 200 || $status_code >= 300 || empty($decoded['data']['id'])) {
+            $message = is_array($decoded) && !empty($decoded['detail'])
+                ? (string) $decoded['detail']
+                : 'X rejected the post request.';
+
+            return new WP_Error('ace_x_publish_rejected', $message, ['status' => 502]);
+        }
+
+        return [
+            'published' => true,
+            'tweetId' => (string) $decoded['data']['id'],
+            'text' => (string) ($decoded['data']['text'] ?? $text),
+        ];
+    }
+
     private static function exchange_code_for_token($code, $code_verifier) {
         $settings = ACE_Admin::get_settings();
         $client_id = trim((string) ($settings['networks']['x']['client_id'] ?? ''));
@@ -218,6 +278,44 @@ class ACE_Provider_X {
         }
 
         return $decoded['data'];
+    }
+
+    private static function refresh_access_token($refresh_token) {
+        $settings = ACE_Admin::get_settings();
+        $client_id = trim((string) ($settings['networks']['x']['client_id'] ?? ''));
+
+        if ($client_id === '') {
+            return new WP_Error('ace_x_missing_client_id', 'The X Client ID is missing.', ['status' => 400]);
+        }
+
+        $response = wp_remote_post('https://api.x.com/2/oauth2/token', [
+            'timeout' => 30,
+            'headers' => [
+                'Content-Type' => 'application/x-www-form-urlencoded',
+            ],
+            'body' => [
+                'grant_type' => 'refresh_token',
+                'refresh_token' => $refresh_token,
+                'client_id' => $client_id,
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            return new WP_Error('ace_x_refresh_failed', $response->get_error_message(), ['status' => 502]);
+        }
+
+        $status_code = (int) wp_remote_retrieve_response_code($response);
+        $decoded = json_decode(wp_remote_retrieve_body($response), true);
+
+        if ($status_code < 200 || $status_code >= 300 || !is_array($decoded) || empty($decoded['access_token'])) {
+            $message = is_array($decoded) && !empty($decoded['error_description'])
+                ? (string) $decoded['error_description']
+                : 'Unable to refresh the X access token.';
+
+            return new WP_Error('ace_x_refresh_rejected', $message, ['status' => 502]);
+        }
+
+        return $decoded;
     }
 
     private static function generate_code_verifier() {

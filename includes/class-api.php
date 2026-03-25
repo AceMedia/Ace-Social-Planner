@@ -63,6 +63,42 @@ class ACE_API {
             'callback' => [__CLASS__, 'disconnect_x'],
             'permission_callback' => [__CLASS__, 'can_manage_plugin'],
         ]);
+
+        register_rest_route('ace-social/v1', '/providers/x/publish-test', [
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => [__CLASS__, 'publish_test_x'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
+
+        register_rest_route('ace-social/v1', '/providers/facebook/connect-url', [
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => [__CLASS__, 'get_facebook_connect_url'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
+
+        register_rest_route('ace-social/v1', '/providers/facebook/disconnect', [
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => [__CLASS__, 'disconnect_facebook'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
+
+        register_rest_route('ace-social/v1', '/providers/facebook/pages', [
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => [__CLASS__, 'get_facebook_pages'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
+
+        register_rest_route('ace-social/v1', '/providers/facebook/select-page', [
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => [__CLASS__, 'select_facebook_page'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
+
+        register_rest_route('ace-social/v1', '/providers/facebook/publish-test', [
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => [__CLASS__, 'publish_test_facebook'],
+            'permission_callback' => [__CLASS__, 'can_manage_plugin'],
+        ]);
     }
 
     public static function can_manage_plugin() {
@@ -138,6 +174,67 @@ class ACE_API {
 
     public static function disconnect_x() {
         return rest_ensure_response(ACE_Provider_X::disconnect());
+    }
+
+    public static function publish_test_x(WP_REST_Request $request) {
+        $payload = $request->get_json_params();
+        $payload = is_array($payload) ? $payload : [];
+        $text = isset($payload['text']) ? (string) $payload['text'] : '';
+        $result = ACE_Provider_X::publish_test($text);
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        return rest_ensure_response($result);
+    }
+
+    public static function get_facebook_connect_url() {
+        $url = ACE_Provider_Facebook::get_authorize_url(get_current_user_id());
+
+        if (is_wp_error($url)) {
+            return $url;
+        }
+
+        return rest_ensure_response([
+            'authorizeUrl' => $url,
+            'connection' => ACE_Provider_Facebook::get_connection_status(),
+        ]);
+    }
+
+    public static function disconnect_facebook() {
+        return rest_ensure_response(ACE_Provider_Facebook::disconnect());
+    }
+
+    public static function get_facebook_pages() {
+        return rest_ensure_response(ACE_Provider_Facebook::get_pages());
+    }
+
+    public static function select_facebook_page(WP_REST_Request $request) {
+        $payload = $request->get_json_params();
+        $payload = is_array($payload) ? $payload : [];
+        $page_id = isset($payload['pageId']) ? (string) $payload['pageId'] : '';
+        $result = ACE_Provider_Facebook::select_page($page_id);
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        return rest_ensure_response($result);
+    }
+
+    public static function publish_test_facebook(WP_REST_Request $request) {
+        $payload = $request->get_json_params();
+        $payload = is_array($payload) ? $payload : [];
+        $message = isset($payload['message']) ? (string) $payload['message'] : '';
+        $link = isset($payload['link']) ? (string) $payload['link'] : '';
+        $result = ACE_Provider_Facebook::publish_test($message, $link);
+
+        if (is_wp_error($result)) {
+            return $result;
+        }
+
+        return rest_ensure_response($result);
     }
 
     public static function generate_ai(WP_REST_Request $request) {
